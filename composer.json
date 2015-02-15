@@ -1,0 +1,30 @@
+{
+  "name": "epforgpl/parsers-senat",
+  "type": "library",
+  "description": "Parsing data from Polish Senat",
+  "keywords": [
+    "scraper",
+    "parser",
+    "poland",
+    "polish",
+    "senat",
+    "senate",
+    "parldata"
+  ],
+  "homepage": "https://github.com/epforgpl/parsers-senat",
+  "authors": [
+    {
+      "name": "Jakub Król",
+      "email": "j.krol@media30.pl",
+      "homepage": "http://media30.pl"
+    },
+    {
+      "name": "Krzysztof Madejski",
+      "email": "krzysztof.madejski@epf.org.pl",
+      "homepage": "http://epf.org.pl"
+    }
+  ],
+  "require": {
+    "gilbitron/php-simplecache": "~1.4"
+  }
+}

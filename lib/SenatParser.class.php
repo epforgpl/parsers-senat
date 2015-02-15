@@ -4,9 +4,27 @@
  * @ver 1.2
  */
 
+define('__ROOT__', dirname(dirname(__FILE__)));
+require_once(__ROOT__ . '/vendor/autoload.php');
 
 class SenatParser {
     const BASE_URL = 'http://senat.gov.pl';
+
+    private $cache;
+
+    public function __construct() {
+        if (defined('CACHE_ENABLED') ? CACHE_ENABLED : false) {
+            $this->cache = new Gilbitron\Util\SimpleCache();
+
+            $this->cache->cache_path = defined('CACHE_PATH') ? CACHE_PATH : __ROOT__ . '/.cache/';
+            $this->cache->cache_time = defined('CACHE_TTL') ? CACHE_TTL : 3600;
+
+            if (!is_dir($this->cache->cache_path)) {
+                mkdir($this->cache->cache_path, 0755, true);
+            }
+            $this->debug('Using cache in ' . $this->cache->cache_path);
+        }
+    }
 
     /**
      * Send a POST requst using cURL
@@ -15,8 +33,13 @@ class SenatParser {
      * @param array $options for cURL
      * @return string
      */
-    private function curl_post($url, array $post = array(), array $options = array())
-    {
+    private function curl_post($url, array $post = array(), array $options = array()) {
+        if ($this->cache) {
+            $cache_id = sha1(json_encode(array('url' => $url, 'post' => $post)));
+            if ($this->cache->is_cached($cache_id))
+                return $this->cache->get_cache($cache_id);
+        }
+
         $defaults = array(
             CURLOPT_POST => 1,
             CURLOPT_HEADER => 0,
@@ -31,11 +54,14 @@ class SenatParser {
 
         $ch = curl_init();
         curl_setopt_array($ch, ($options + $defaults));
-        if( ! $result = curl_exec($ch))
-        {
-            throw new Exception('CURL error: '.curl_error($ch));
+        if (!$result = curl_exec($ch)) {
+            throw new Exception('CURL error: ' . curl_error($ch));
         }
         curl_close($ch);
+
+        if ($this->cache) {
+            $this->cache->set_cache($cache_id, $result);
+        }
         return $result;
     }
 
@@ -46,10 +72,15 @@ class SenatParser {
      * @param array $options for cURL
      * @return string
      */
-    private function curl_get($url, array $get = array(), array $options = array())
-    {
+    private function curl_get($url, array $get = array(), array $options = array()) {
+        if ($this->cache) {
+            $cache_id = sha1(json_encode(array('url' => $url, 'get' => $get)));
+            if ($this->cache->is_cached($cache_id))
+                return $this->cache->get_cache($cache_id);
+        }
+
         $defaults = array(
-            CURLOPT_URL => $url. (strpos($url, '?') === FALSE ? '?' : ''). http_build_query($get),
+            CURLOPT_URL => $url . (strpos($url, '?') === FALSE ? '?' : '') . http_build_query($get),
             CURLOPT_HEADER => 0,
             CURLOPT_RETURNTRANSFER => TRUE,
             CURLOPT_USERAGENT => 'Mozilla/5.0 (SenatParser; Fundacja Media 3.0) Gecko/20100101 Firefox/31.0',
@@ -58,11 +89,14 @@ class SenatParser {
 
         $ch = curl_init();
         curl_setopt_array($ch, ($options + $defaults));
-        if( ! $result = curl_exec($ch))
-        {
-            throw new Exception('CURL error: '.curl_error($ch));
+        if (!$result = curl_exec($ch)) {
+            throw new Exception('CURL error: ' . curl_error($ch));
         }
         curl_close($ch);
+
+        if ($this->cache) {
+            $this->cache->set_cache($cache_id, $result);
+        }
         return $result;
     }
 
@@ -71,12 +105,9 @@ class SenatParser {
      * @param array $m Input array
      * @return array $m Turned 90 degrees
      */
-    private function turn_array($m)
-    {
-        for ($z = 0;$z < count($m);$z++)
-        {
-            for ($x = 0;$x < count($m[$z]);$x++)
-            {
+    private function turn_array($m) {
+        for ($z = 0; $z < count($m); $z++) {
+            for ($x = 0; $x < count($m[$z]); $x++) {
                 $rt[$x][$z] = $m[$z][$x];
             }
         }
@@ -90,7 +121,7 @@ class SenatParser {
      * @param string $chars
      * @return string Trimmed $s.
      */
-    private function trimEx($s, $chars = " \t\r\n"){
+    private function trimEx($s, $chars = " \t\r\n") {
         return trim($s, $chars);
     }
 
@@ -101,14 +132,14 @@ class SenatParser {
      * @param string|int|null $to Set to NULL to copy till the end, set to some INTEGER value to copy characters count.
      * @return string $s[$from - $to]
      */
-    private function cpyFromTo($s, $from = NULL, $to = NULL){
-        if (!is_null($from)){
+    private function cpyFromTo($s, $from = NULL, $to = NULL) {
+        if (!is_null($from)) {
             if (is_int($from))
                 $s = mb_substr($s, $from);
             else
-                $s = mb_substr($s, mb_strpos($s, $from)+mb_strlen($from));
+                $s = mb_substr($s, mb_strpos($s, $from) + mb_strlen($from));
         }
-        if (!is_null($to)){
+        if (!is_null($to)) {
             if (is_int($to))
                 $s = mb_substr($s, 0, $to);
             else
@@ -123,19 +154,19 @@ class SenatParser {
      * @param bool $andTrimEx Set to true (default) to begin with $this->trimEx($s) call.
      * @return string $s without double spaces
      */
-    private function removeDblSpaces($s, $andTrimEx=TRUE){
+    private function removeDblSpaces($s, $andTrimEx = TRUE) {
         if ($andTrimEx)
             $s = $this->trimEx($s);
         $s = str_replace("\t", ' ', $s);
-        while (strpos($s, '  ')!==false)
+        while (strpos($s, '  ') !== false)
             $s = str_replace('  ', ' ', $s);
         return $s;
     }
 
-    private function tryToFind1($subject, $regEx, $group, $default = ''){
+    private function tryToFind1($subject, $regEx, $group, $default = '') {
         $matches = array();
         preg_match_all($regEx, $subject, $matches);
-        if ((empty($matches))||(!is_array($matches[$group]))||(empty($matches[$group])))
+        if ((empty($matches)) || (!is_array($matches[$group])) || (empty($matches[$group])))
             return $default;
         else
             return $matches[$group][0];
@@ -146,7 +177,7 @@ class SenatParser {
      * @param string $html
      * @return string Empty if not found.
      */
-    private function _senatorExtractOKW($html){
+    private function _senatorExtractOKW($html) {
         $re = "/<div class=\"informacje\">[\\s\\S]*?<li>(Okręg ([^<]*))<\\/li>/";
 
         $m = $this->tryToFind1($html, $re, 1);
@@ -158,7 +189,7 @@ class SenatParser {
      * @param string $html
      * @return string Empty if not found.
      */
-    private function _senatorExtractWWW($html){
+    private function _senatorExtractWWW($html) {
         $re = "/<div class=\"informacje\">[\\s\\S]*?<li>[\\s\\S]*?WWW:[^\"]*?\"([^\"]*)\"[\\s\\S]*?<\\/li>/";
 
         $m = $this->tryToFind1($html, $re, 1);
@@ -170,7 +201,7 @@ class SenatParser {
      * @param string $html
      * @return array Empty if not found.
      */
-    private function _senatorExtractCadencies($html){
+    private function _senatorExtractCadencies($html) {
         $re = "/<div class=\"informacje\">[\\s\\S]*?<li>(Kadencje:([^<]*))<\\/li>/";
 
         $m = $this->trimEx($this->tryToFind1($html, $re, 2));
@@ -186,19 +217,19 @@ class SenatParser {
      * @param string $html
      * @return string Empty if not found.
      */
-    private function _senatorExtractEmail($html){
+    private function _senatorExtractEmail($html) {
         $re = "/<div class=\"informacje\">[\\s\\S]*?<li>[\\s\\S]*?E-mail:[^<]*?<script type=\"text\\/javascript\">[^S]*SendTo\\('[^']*?', '[^']*?', '([^']*)', '([^']*)', [\\s\\S]*?<\\/script>[\\s\\S]*?<\\/li>/";
 
         $matches = array();
         preg_match_all($re, $html, $matches);
-        if ((empty($matches))||(empty($matches[0])))
+        if ((empty($matches)) || (empty($matches[0])))
             return array();
         $matches = $this->turn_array($matches);
 
-        if ((empty($matches))||(count($matches[0])<2))
+        if ((empty($matches)) || (count($matches[0]) < 2))
             return '';
         else
-            return $matches[0][1].'@'.$matches[0][2];
+            return $matches[0][1] . '@' . $matches[0][2];
     }
 
     /**
@@ -206,8 +237,8 @@ class SenatParser {
      * @param string $html
      * @return array Empty if not found.
      */
-    private function _senatorExtractClubs($html){
-        if (strpos($html, '<div class="kluby">')===false)
+    private function _senatorExtractClubs($html) {
+        if (strpos($html, '<div class="kluby">') === false)
             return array();
         $html = $this->cpyFromTo($html, '<div class="kluby">', '</div>');
 
@@ -217,16 +248,16 @@ class SenatParser {
         preg_match_all($re, $html, $matches);
         $matches = $this->turn_array($matches);
 
-        if ((empty($matches))||(count($matches[0])<5))
+        if ((empty($matches)) || (count($matches[0]) < 5))
             return array();
 
         $clubs = array();
 
-        foreach($matches as $match){
+        foreach ($matches as $match) {
             $clubs[$match[3]] = array(
-                'id'=>$match[3],
-                'name'=>$match[4],
-                'url'=>self::BASE_URL.$match[1]
+                'id' => $match[3],
+                'name' => $match[4],
+                'url' => self::BASE_URL . $match[1]
             );
         }
 
@@ -238,7 +269,7 @@ class SenatParser {
      * @param string $html
      * @return string Empty if not found.
      */
-    private function _senatorExtractBioNote($html){
+    private function _senatorExtractBioNote($html) {
         $re = "/<div class=\"sekcja-2\">[^<]*?<p style=\"text-align: justify;\">([\\s\\S]*)<\\/div>[^<]*?<div class=\"sekcja-2\">/";
 
         $m = $this->tryToFind1($html, $re, 1);
@@ -253,8 +284,8 @@ class SenatParser {
      * @param string $html
      * @return array Empty if not found.
      */
-    private function _senatorExtractEmployees($html){
-        if (strpos($html, '<h3>Pracownicy i współpracownicy</h3>')===false)
+    private function _senatorExtractEmployees($html) {
+        if (strpos($html, '<h3>Pracownicy i współpracownicy</h3>') === false)
             return array();
         $html = $this->cpyFromTo($html, '<h3>Pracownicy i współpracownicy</h3>', '<div class="js-content komisje">');
 
@@ -262,20 +293,20 @@ class SenatParser {
 
         $matches = array();
         preg_match_all($re, $html, $matches);
-        if ((empty($matches))||(empty($matches[0])))
+        if ((empty($matches)) || (empty($matches[0])))
             return array();
 
         $matches = $this->turn_array($matches);
 
-        if ((empty($matches))||(count($matches[0])<3))
+        if ((empty($matches)) || (count($matches[0]) < 3))
             return array();
 
         $employees = array();
 
-        foreach($matches as $match){
+        foreach ($matches as $match) {
             $employees[] = array(
-                'name'=>$match[2],
-                'url'=>self::BASE_URL.$match[1]
+                'name' => $match[2],
+                'url' => self::BASE_URL . $match[1]
             );
         }
 
@@ -289,8 +320,8 @@ class SenatParser {
      * @param string $to End of team`s HTML
      * @return array Empty if not found.
      */
-    private function __senatorExtractTeams($html, $from, $to){
-        if (strpos($html, $from)===false)
+    private function __senatorExtractTeams($html, $from, $to) {
+        if (strpos($html, $from) === false)
             return array();
         $html = $this->cpyFromTo($html, $from, $to);
 
@@ -300,18 +331,18 @@ class SenatParser {
         preg_match_all($re, $html, $matches);
         $matches = $this->turn_array($matches);
 
-        if ((empty($matches))||(count($matches[0])<6))
+        if ((empty($matches)) || (count($matches[0]) < 6))
             return array();
 
         $team = array();
 
-        foreach($matches as $match){
+        foreach ($matches as $match) {
             $team[$match[2]] = array(
-                'id'=>$match[2],
-                'name'=>$match[3],
-                'url'=>self::BASE_URL.$match[1],
-                'notes'=>$this->removeDblSpaces(strip_tags($match[4])),
-                'when'=>$this->removeDblSpaces(strip_tags($match[5]))
+                'id' => $match[2],
+                'name' => $match[3],
+                'url' => self::BASE_URL . $match[1],
+                'notes' => $this->removeDblSpaces(strip_tags($match[4])),
+                'when' => $this->removeDblSpaces(strip_tags($match[5]))
             );
         }
 
@@ -323,7 +354,7 @@ class SenatParser {
      * @param string $html
      * @return array Empty if not found.
      */
-    private function _senatorExtractCommissions($html){
+    private function _senatorExtractCommissions($html) {
         return $this->__senatorExtractTeams($html, '<div class="js-content komisje">', '</ul>');
     }
 
@@ -332,7 +363,7 @@ class SenatParser {
      * @param string $html
      * @return array Empty if not found.
      */
-    private function _senatorExtractParlimentaryAssemblies($html){
+    private function _senatorExtractParlimentaryAssemblies($html) {
         return $this->__senatorExtractTeams($html, '<p class="etykieta">Zespoły parlamentarne</p>', '</ul>');
     }
 
@@ -341,12 +372,12 @@ class SenatParser {
      * @param string $html
      * @return array Empty if not found.
      */
-    private function _senatorExtractSenatAssemblies($html){
+    private function _senatorExtractSenatAssemblies($html) {
         return $this->__senatorExtractTeams($html, '<p class="etykieta">Zespoły senackie</p>', '</ul>');
     }
 
-    public function updateSenatorSpeechesList($SenatorID){
-        $html = $this->curl_get(self::BASE_URL.'/sklad/senatorowie/aktywnosc,'.$SenatorID.',8.html');
+    public function updateSenatorSpeechesList($SenatorID) {
+        $html = $this->curl_get(self::BASE_URL . '/sklad/senatorowie/aktywnosc,' . $SenatorID . ',8.html');
 
         $re = "/<tr>[^<]*?<td class=\"numer-posiedzenia\">([\\d]*?)<\\/td>[\\s\\S]*?<td class=\"data-aktywnosci nowrap\">([^<]*?)<\\/td>[^<]*?<td class=\"punkt\">([^<]*?)<\\/td>[^<]*?<td class=\"etapy\">([\\s\\S]*?)<\\/td>[^<]*?<\\/tr>/";
 
@@ -357,34 +388,34 @@ class SenatParser {
         $matches = $this->turn_array($matches);
 
         $ar = array();
-        foreach($matches as $match){
+        foreach ($matches as $match) {
             $activity = array();
 
             $actMatches = array();
             preg_match_all($reAct, $match[4], $actMatches);
             $actMatches = $this->turn_array($actMatches);
-            foreach($actMatches as $aMatch){
+            foreach ($actMatches as $aMatch) {
                 $activity[] = array(
-                    'title'=>$this->trimEx($aMatch[4]),
-                    'is_in_stenogram'=>$aMatch[2]=='',
-                    'meeting_id'=>$aMatch[1],
-                    'speech_ref'=>$aMatch[3]
+                    'title' => $this->trimEx($aMatch[4]),
+                    'is_in_stenogram' => $aMatch[2] == '',
+                    'meeting_id' => $aMatch[1],
+                    'speech_ref' => $aMatch[3]
                 );
             }
 
             $ar[] = array(
-                'no_of_meeting'=>$match[1],
-                'when'=>$this->trimEx($match[2]),
-                'title_of_agenda_item'=>$this->trimEx($match[3]),
-                'activity'=>$activity
+                'no_of_meeting' => $match[1],
+                'when' => $this->trimEx($match[2]),
+                'title_of_agenda_item' => $this->trimEx($match[3]),
+                'activity' => $activity
             );
         }
 
         return $ar;
     }
 
-    public function updateSenatorVotesAtMeeting($SenatorID, $MeetingID){
-        $html = $this->curl_get(self::BASE_URL.'/sklad/senatorowie/aktywnosc-glosowania,'.$SenatorID.',8,szczegoly,'.$MeetingID.'.html');
+    public function updateSenatorVotesAtMeeting($SenatorID, $MeetingID) {
+        $html = $this->curl_get(self::BASE_URL . '/sklad/senatorowie/aktywnosc-glosowania,' . $SenatorID . ',8,szczegoly,' . $MeetingID . '.html');
 
         $re = "/<td>[^<]*?<a href=\"(\\/sklad\\/senatorowie\\/szczegoly-glosowania,([^,]*),([^,]*),8.html)\">[^<]*?<\\/a>[^<]*?<\\/td>[^<]*?<td>[^<]*?<\\/td>[^<]*?<td>([^<]*)<\\/td>/";
 
@@ -393,18 +424,18 @@ class SenatParser {
         $matches = $this->turn_array($matches);
 
         $ans = array();
-        foreach($matches as $match){
-            $ans[$match[2].','.$match[3]] = array(
-                'voting_id'=>$match[2].','.$match[3],
-                'vote'=>$this->trimEx($match[4])
+        foreach ($matches as $match) {
+            $ans[$match[2] . ',' . $match[3]] = array(
+                'voting_id' => $match[2] . ',' . $match[3],
+                'vote' => $this->trimEx($match[4])
             );
         }
         return $ans;
     }
 
     //Vote might me: za/przeciw/wstrzymał się/nie głosował/nieobecny
-    public function updateSenatorVotingActivity($SenatorID){
-        $html = $this->curl_get(self::BASE_URL.'/sklad/senatorowie/aktywnosc-glosowania,'.$SenatorID.',8.html');
+    public function updateSenatorVotingActivity($SenatorID) {
+        $html = $this->curl_get(self::BASE_URL . '/sklad/senatorowie/aktywnosc-glosowania,' . $SenatorID . ',8.html');
 
         $re = "/<td class=\"nowrap\">[^<]*?<a href=\"(\\/sklad\\/senatorowie\\/aktywnosc-glosowania,[\\d]*,8,szczegoly,([^.]*)\\.html)\">[^<]*?<\\/a>[^<]*?<\\/td>/";
 
@@ -413,39 +444,39 @@ class SenatParser {
         $matches = $this->turn_array($matches);
 
         $ans = array();
-        foreach($matches as $match){
+        foreach ($matches as $match) {
             $ans[$match[2]] = $this->updateSenatorVotesAtMeeting($SenatorID, $match[2]);
         }
         return $ans;
     }
 
-    public function updateSenatorInfo($SenatorID){
-        try{
-        $html = $this->curl_get(self::BASE_URL.'/sklad/senatorowie/senator,'.$SenatorID.',8,get-data.html');
-        } catch (Exception $e){
+    public function updateSenatorInfo($SenatorID) {
+        try {
+            $html = $this->curl_get(self::BASE_URL . '/sklad/senatorowie/senator,' . $SenatorID . ',8,get-data.html');
+        } catch (Exception $e) {
             return false;
         }
         $answer = array(
-            'okw'=>$this->_senatorExtractOKW($html),
-            'cadencies'=>$this->_senatorExtractCadencies($html),
-            'email'=>$this->_senatorExtractEmail($html),
-            'www'=>$this->_senatorExtractWWW($html),
-            'clubs'=>$this->_senatorExtractClubs($html),
-            'bio_note'=>$this->_senatorExtractBioNote($html),
-            'statements_of_assets_and_record_of_benefits'=>self::BASE_URL.'/sklad/senatorowie/oswiadczenia,'.$SenatorID.',8.html',
-            'employees_cooperates'=>$this->_senatorExtractEmployees($html),
-            'commissions'=>$this->_senatorExtractCommissions($html),
-            'parliamentary_assemblies'=>$this->_senatorExtractParlimentaryAssemblies($html),
-            'senat_assemblies'=>$this->_senatorExtractSenatAssemblies($html),
-            'activity_senat_meetings'=>$this->updateSenatorSpeechesList($SenatorID),
-            'senator_statements'=>self::BASE_URL.'/sklad/senatorowie/oswiadczenia-senatorskie,'.$SenatorID.',8.html',
+            'okw' => $this->_senatorExtractOKW($html),
+            'cadencies' => $this->_senatorExtractCadencies($html),
+            'email' => $this->_senatorExtractEmail($html),
+            'www' => $this->_senatorExtractWWW($html),
+            'clubs' => $this->_senatorExtractClubs($html),
+            'bio_note' => $this->_senatorExtractBioNote($html),
+            'statements_of_assets_and_record_of_benefits' => self::BASE_URL . '/sklad/senatorowie/oswiadczenia,' . $SenatorID . ',8.html',
+            'employees_cooperates' => $this->_senatorExtractEmployees($html),
+            'commissions' => $this->_senatorExtractCommissions($html),
+            'parliamentary_assemblies' => $this->_senatorExtractParlimentaryAssemblies($html),
+            'senat_assemblies' => $this->_senatorExtractSenatAssemblies($html),
+            'activity_senat_meetings' => $this->updateSenatorSpeechesList($SenatorID),
+            'senator_statements' => self::BASE_URL . '/sklad/senatorowie/oswiadczenia-senatorskie,' . $SenatorID . ',8.html',
         );
         $answer['checksum'] = $this->getChecksumForInfo($answer);
         return $answer;
     }
 
-    public function updateSenatorsList(){
-        $html = $this->curl_get(self::BASE_URL.'/sklad/senatorowie/');
+    public function updateSenatorsList() {
+        $html = $this->curl_get(self::BASE_URL . '/sklad/senatorowie/');
 
         $re = "/<div class=\"senator-kontener\"[^<]*<div class=\"zdjecie\">[^<]*?<img src=\"([^\"]*?)\"[^<]*?<\\/div>[\\s\\S]*?<a href=\"\\/sklad\\/senatorowie\\/senator,([^\"]*)\">([^<]*)<\\/a>[\\s\\S]*?(<p class=\"adnotacja\">([^<]*)<\\/p>| )/"; //
 
@@ -455,14 +486,14 @@ class SenatParser {
 
         $answer = array();
 
-        foreach($base_info_matches as $info){
+        foreach ($base_info_matches as $info) {
             $id = $this->cpyFromTo($info[2], NULL, ',');
             $answer[$id] = array(
-                'id'=>$id,
-                'name'=>$info[3],
-                'notes'=>$this->removeDblSpaces($info[5]),
-                'photo'=>self::BASE_URL.$info[1],
-                'url'=>self::BASE_URL.'/sklad/senatorowie/senator,'.$info[2]
+                'id' => $id,
+                'name' => $info[3],
+                'notes' => $this->removeDblSpaces($info[5]),
+                'photo' => self::BASE_URL . $info[1],
+                'url' => self::BASE_URL . '/sklad/senatorowie/senator,' . $info[2]
             );
         }
         return $answer;
@@ -473,14 +504,14 @@ class SenatParser {
      * @param $inArray Original input array
      * @return string MD5 check-sum.
      */
-    public function getChecksumForInfo($inArray){
+    public function getChecksumForInfo($inArray) {
         return md5(json_encode($inArray));
     }
 
-    public function updateSenatorsAll(){
+    public function updateSenatorsAll() {
         $list = $this->updateSenatorsList();
 
-        foreach($list as &$senator){
+        foreach ($list as &$senator) {
             $senator['info'] = $this->updateSenatorInfo($senator['id']);
         }
 
@@ -494,18 +525,18 @@ class SenatParser {
      * @param bool $removeMarszalekEtc When true (default) it will try to remove speeches of Marszałek and Wicemarszałek (as it would be introduce to next speech).
      * @return string
      */
-    public function extractSpeechRelFromStenogram($meetingTxt, $speechRel, $removeMarszalekEtc=true){
-        $meetingTxt = $this->cpyFromTo($meetingTxt, '<h3 class="speech-rel" id="'.$speechRel.'" rel="'.$speechRel.'"></h3>');
-        if (strpos($meetingTxt, '<h3 class="speech-rel"')!==FALSE)
+    public function extractSpeechRelFromStenogram($meetingTxt, $speechRel, $removeMarszalekEtc = true) {
+        $meetingTxt = $this->cpyFromTo($meetingTxt, '<h3 class="speech-rel" id="' . $speechRel . '" rel="' . $speechRel . '"></h3>');
+        if (strpos($meetingTxt, '<h3 class="speech-rel"') !== FALSE)
             $meetingTxt = $this->cpyFromTo($meetingTxt, null, '<h3 class="speech-rel"');
 
-        if ($removeMarszalekEtc){
-            if (strpos($meetingTxt, ".\r\nMarszałek ")!==FALSE)
-                $meetingTxt = $this->cpyFromTo($meetingTxt, null, ".\r\nMarszałek ").'.';
-            if (strpos($meetingTxt, ".\r\nWicemarszałek ")!==FALSE)
-                $meetingTxt = $this->cpyFromTo($meetingTxt, null, ".\r\nWicemarszałek ").'.';
-            if (strpos($meetingTxt, ".\r\n(Przewodnictwo ")!==FALSE)
-                $meetingTxt = $this->cpyFromTo($meetingTxt, null, ".\r\n(Przewodnictwo ").'.';
+        if ($removeMarszalekEtc) {
+            if (strpos($meetingTxt, ".\r\nMarszałek ") !== FALSE)
+                $meetingTxt = $this->cpyFromTo($meetingTxt, null, ".\r\nMarszałek ") . '.';
+            if (strpos($meetingTxt, ".\r\nWicemarszałek ") !== FALSE)
+                $meetingTxt = $this->cpyFromTo($meetingTxt, null, ".\r\nWicemarszałek ") . '.';
+            if (strpos($meetingTxt, ".\r\n(Przewodnictwo ") !== FALSE)
+                $meetingTxt = $this->cpyFromTo($meetingTxt, null, ".\r\n(Przewodnictwo ") . '.';
         }
 
         $meetingTxt = $this->trimEx($meetingTxt);
@@ -519,18 +550,18 @@ class SenatParser {
      * @param string $meetingID Meeting ID.
      * @return string Text, witouh double spaces, HTML etc.
      */
-    public function updateMeetingStenogram($meetingID){
+    public function updateMeetingStenogram($meetingID) {
         $text = "\r\n";
 
-        $i=0;
+        $i = 0;
         do {
             $i++;
-            $html = $this->curl_get(self::BASE_URL.'/prace/senat/posiedzenia/przebieg,'.$meetingID.','.$i.'.html');
+            $html = $this->curl_get(self::BASE_URL . '/prace/senat/posiedzenia/przebieg,' . $meetingID . ',' . $i . '.html');
 
             $re = "/<div id=\"jq-stenogram-tresc\">([\\s\\S]*?)<script type=\"text\\/javascript\" src=\"\\/szablony\\/senat\\/scripts\\/jquery.colorbox-min.js\"><\\/script>/";
 
-            $tmp=$this->tryToFind1($html, $re, 1);
-            if (!empty($tmp)){
+            $tmp = $this->tryToFind1($html, $re, 1);
+            if (!empty($tmp)) {
                 $tmp = str_replace('</p>', "\r\n", $tmp);
                 $repRe = <<<REGEX
 /<h3 rel="([^"]*?)"[^>]*?>/
@@ -542,21 +573,21 @@ REGEX;
                 $tmp = strip_tags($tmp);
                 $tmp = preg_replace($sprelRe, '<h3 class="speech-rel" id="$1" rel="$1"></h3>', $tmp);
                 $tmp = $this->removeDblSpaces($tmp);
-                $text.=$tmp;
+                $text .= $tmp;
             }
 
-        } while(strpos($html, ' class="link-stenogram-nastepny-dzien"')!==FALSE);
+        } while (strpos($html, ' class="link-stenogram-nastepny-dzien"') !== FALSE);
 
         return $this->trimEx($text);
     }
 
-    public function updateMeetingVotings($meetingID){
+    public function updateMeetingVotings($meetingID) {
         $ans = array();
 
-        $i=0;
+        $i = 0;
         do {
             $i++;
-            $html = $this->curl_get(self::BASE_URL.'/prace/senat/posiedzenia/przebieg,'.$meetingID.','.$i.',glosowania.html');
+            $html = $this->curl_get(self::BASE_URL . '/prace/senat/posiedzenia/przebieg,' . $meetingID . ',' . $i . ',glosowania.html');
 
             $re = "/<tr>[^<]*?<td>[^<]*?<\\/td>[^<]*?<td>([\\s\\S]*?)<\\/td>[\\s\\S]*?<a href=\"http:\\/\\/senat.gov.pl\\/sklad\\/senatorowie\\/szczegoly-glosowania,([^,]*,[^,]),8.html\">/";
 
@@ -564,15 +595,15 @@ REGEX;
             preg_match_all($re, $html, $matches);
             $matches = $this->turn_array($matches);
 
-            foreach($matches as $match){
+            foreach ($matches as $match) {
                 $ans[$match[2]] = array(
-                    'voting_id'=>$match[2],
-                    'day'=>$i,
-                    'subject'=>$this->removeDblSpaces(strip_tags($match[1]))
+                    'voting_id' => $match[2],
+                    'day' => $i,
+                    'subject' => $this->removeDblSpaces(strip_tags($match[1]))
                 );
             }
 
-        } while(strpos($html, ' class="link-stenogram-nastepny-dzien"')!==FALSE);
+        } while (strpos($html, ' class="link-stenogram-nastepny-dzien"') !== FALSE);
 
         return $ans;
     }
@@ -581,31 +612,37 @@ REGEX;
      * This will return list of all meetings
      * @return array ['id'=>ID of meeting, 'name'=>Name/title/subject of meeting. 'when'=>Date(s) of meeting(s)]
      */
-    public function updateMeetingsList(){
+    public function updateMeetingsList() {
         $answer = array();
 
-        $i=0;
+        $i = 0;
         do {
             $i++;
-            $html = $this->curl_get(self::BASE_URL.'/prace/senat/posiedzenia/page,'.$i.'.html');
+            $html = $this->curl_get(self::BASE_URL . '/prace/senat/posiedzenia/page,' . $i . '.html');
 
             $re = "/<tr [^<]*?>[^<]*?<td class=\"pierwsza\">[\\s\\S]*?<a href=\"(([^,]*),([\\d]*?),([^\"]*))\"[^>]*?>([^<]*)<\\/a>[\\s\\S]*?<\\/td>[\\s\\S]*?<td>([^<]*)<\\/td>[\\s\\S]*?<td class=\"ostatnia\">[\\s\\S]*?<a class=\"stenogram-link\".*?href=\"([^\"]*)\"[^>]*?>[\\s\\S]*?<\\/tr>/";
             $base_info_matches = array();
             preg_match_all($re, $html, $base_info_matches);
             $base_info_matches = $this->turn_array($base_info_matches);
 
-            foreach($base_info_matches as $info){
+            foreach ($base_info_matches as $info) {
                 $id = $info[3];
                 $answer[$id] = array(
-                    'id'=>$id,
-                    'name'=>$this->trimEx($info[5]),
-                    'when'=>$this->trimEx($info[6]),
+                    'id' => $id,
+                    'name' => $this->trimEx($info[5]),
+                    'when' => $this->trimEx($info[6]),
 //                    'topics_url'=>self::BASE_URL.$info[1],
 //                    'stenogram_url'=>self::BASE_URL.$info[7]
                 );
             }
 
-        } while(strpos($html, '<div class="pager-nastepne">')!==FALSE);
+        } while (strpos($html, '<div class="pager-nastepne">') !== FALSE);
         return $answer;
+    }
+
+    private function debug($msg) {
+        if (defined('DEBUG') and DEBUG) {
+            echo $msg . "\n";
+        }
     }
 } 
