@@ -388,6 +388,7 @@ class SenatParser {
         $matches = $this->turn_array($matches);
 
         $ar = array();
+        // TODO handle no matches
         foreach ($matches as $match) {
             $activity = array();
 
@@ -451,17 +452,16 @@ class SenatParser {
     }
 
     public function updateSenatorInfo($SenatorID) {
-        try {
-            $html = $this->curl_get(self::BASE_URL . '/sklad/senatorowie/senator,' . $SenatorID . ',8,get-data.html');
-        } catch (Exception $e) {
-            return false;
-        }
+        $html = $this->curl_get(self::BASE_URL . '/sklad/senatorowie/senator,' . $SenatorID . ',8,get-data.html');
+
         $answer = array(
+            'id' => $SenatorID,
             'okw' => $this->_senatorExtractOKW($html),
             'cadencies' => $this->_senatorExtractCadencies($html),
             'email' => $this->_senatorExtractEmail($html),
             'www' => $this->_senatorExtractWWW($html),
             'clubs' => $this->_senatorExtractClubs($html),
+            // TODO bionote missing for id = 100, 101, ..
             'bio_note' => $this->_senatorExtractBioNote($html),
             'statements_of_assets_and_record_of_benefits' => self::BASE_URL . '/sklad/senatorowie/oswiadczenia,' . $SenatorID . ',8.html',
             'employees_cooperates' => $this->_senatorExtractEmployees($html),
@@ -471,6 +471,8 @@ class SenatParser {
             'activity_senat_meetings' => $this->updateSenatorSpeechesList($SenatorID),
             'senator_statements' => self::BASE_URL . '/sklad/senatorowie/oswiadczenia-senatorskie,' . $SenatorID . ',8.html',
         );
+        $answer['birth_date'] = $this->_senatorExtractBirthDate($answer['bio_note']);
+
         $answer['checksum'] = $this->getChecksumForInfo($answer);
         return $answer;
     }
@@ -491,6 +493,7 @@ class SenatParser {
             $answer[$id] = array(
                 'id' => $id,
                 'name' => $info[3],
+                // TODO gender from name
                 'notes' => $this->removeDblSpaces($info[5]),
                 'photo' => self::BASE_URL . $info[1],
                 'url' => self::BASE_URL . '/sklad/senatorowie/senator,' . $info[2]
@@ -640,9 +643,81 @@ REGEX;
         return $answer;
     }
 
+    /**
+     * Returns list of archival terms of office
+     *
+     * @return array
+     * @throws Exception
+     */
+    public function getTermsOfOffice() {
+//        $html = $this->curl_get(self::BASE_URL . '/poprzednie-kadencje/');
+//
+//        $re = "/<div class=\"senator-kontener\"[^<]*<div class=\"zdjecie\">[^<]*?<img src=\"([^\"]*?)\"[^<]*?<\\/div>[\\s\\S]*?<a href=\"\\/sklad\\/senatorowie\\/senator,([^\"]*)\">([^<]*)<\\/a>[\\s\\S]*?(<p class=\"adnotacja\">([^<]*)<\\/p>| )/"; //
+//
+//        $base_info_matches = array();
+//        preg_match_all($re, $html, $base_info_matches);
+//        $base_info_matches = $this->turn_array($base_info_matches);
+//
+//        $answer = array();
+//
+//        foreach ($base_info_matches as $info) {
+//            $id = $this->cpyFromTo($info[2], NULL, ',');
+//            $answer[$id] = array(
+//                'id' => $id,
+//                'name' => $info[3],
+//                // TODO gender from name
+//                'notes' => $this->removeDblSpaces($info[5]),
+//                'photo' => self::BASE_URL . $info[1],
+//                'url' => self::BASE_URL . '/sklad/senatorowie/senator,' . $info[2]
+//            );
+//        }
+//        return $answer;
+    }
+
     private function debug($msg) {
         if (defined('DEBUG') and DEBUG) {
             echo $msg . "\n";
         }
     }
-} 
+
+    private function _senatorExtractBirthDate($bio_note) {
+        $matches = array();
+        if (preg_match('/Urodził(a)? się (\d+)\s+(\w+)\s+(\d{4})/i', $bio_note, $matches)) {
+            try {
+                $month = $this->mapPlMonth($matches[3]);
+            } catch(Exception $ex) {
+                throw new Exception($ex->getMessage() . ': ' . $bio_note, 0, $ex);
+            }
+
+            return $matches[4] . '-' . $month . '-' . str_pad($matches[2], 2, '0', STR_PAD_LEFT);
+
+        } else {
+            # TODO warnings
+            echo "Nieznana data urodzin: " . $bio_note . "\n";
+        }
+        return null;
+    }
+
+    private function mapPlMonth($month) {
+        $months = array(
+            'stycznia' => '01',
+            'lutego' => '02',
+            'marca' => '03',
+            'kwietnia' => '04',
+            'maja' => '05',
+            'czerwca' => '06',
+            'lipca' => '07',
+            'sierpnia' => '08',
+            'września' => '09',
+            'października' => '10',
+            'listopada' => '11',
+            'grudnia' => '12'
+        );
+
+        if (isset($months[$month])) {
+            return $months[$month];
+        }
+
+        throw new Exception("Unknown month: " . $month);
+    }
+}
