@@ -9,7 +9,6 @@ namespace parldata\parsers;
 define('__ROOT__', dirname(__FILE__));
 require_once(__ROOT__ . '/vendor/autoload.php');
 require_once(__ROOT__ . '/vendor/simple_html_dom.php');
-require_once(__ROOT__ . '/vendor/utf8.inc');
 require_once(__ROOT__ . '/names.polish.php');
 
 class ParserException extends \Exception {
