@@ -62,7 +62,12 @@ define('HDOM_INFO_ENDSPACE',7);
 define('DEFAULT_TARGET_CHARSET', 'UTF-8');
 define('DEFAULT_BR_TEXT', "\r\n");
 define('DEFAULT_SPAN_TEXT', " ");
-define('MAX_FILE_SIZE', 600000);
+
+// increase max size for SenatParser
+define('MAX_FILE_SIZE', 2000000);
+
+class SimpleHtmlDomException extends Exception {};
+
 // helper functions
 // -----------------------------------------------------------------------------
 // get html dom from file
@@ -88,11 +93,18 @@ function file_get_html($url, $use_include_path = false, $context=null, $offset =
 function str_get_html($str, $lowercase=true, $forceTagsClosed=true, $target_charset = DEFAULT_TARGET_CHARSET, $stripRN=true, $defaultBRText=DEFAULT_BR_TEXT, $defaultSpanText=DEFAULT_SPAN_TEXT)
 {
     $dom = new simple_html_dom(null, $lowercase, $forceTagsClosed, $target_charset, $stripRN, $defaultBRText, $defaultSpanText);
-    if (empty($str) || strlen($str) > MAX_FILE_SIZE)
+    if (empty($str))
     {
         $dom->clear();
-        return false;
+        return null;
     }
+    $length = strlen($str);
+    if ($length > MAX_FILE_SIZE)
+    {
+        $dom->clear();
+        throw new Exception("Content having $length chars, exceeded max size of " . MAX_FILE_SIZE);
+    }
+
     $dom->load($str, $lowercase, $stripRN);
     return $dom;
 }
