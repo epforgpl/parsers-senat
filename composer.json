@@ -24,6 +24,11 @@
       "homepage": "http://epf.org.pl"
     }
   ],
+  "autoload": {
+    "psr-4": {
+      "epforgpl\\parsers\\": "src/"
+    }
+  },
   "require": {
     "gilbitron/php-simplecache": "~1.4"
   }

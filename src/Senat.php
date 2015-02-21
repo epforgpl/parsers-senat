@@ -4,12 +4,10 @@
  * @ver 1.2
  */
 
-namespace parldata\parsers;
+namespace epforgpl\parsers;
 
-define('__ROOT__', dirname(__FILE__));
-require_once(__ROOT__ . '/vendor/autoload.php');
-require_once(__ROOT__ . '/vendor/simple_html_dom.php');
-require_once(__ROOT__ . '/names.polish.php');
+require_once(dirname(dirname(__FILE__)) . '/vendor/simple_html_dom.php');
+require_once('names.polish.php');
 
 class ParserException extends \Exception {
 }
@@ -26,7 +24,7 @@ class Senat {
         if (defined('CACHE_ENABLED') ? CACHE_ENABLED : false) {
             $this->cache = new \Gilbitron\Util\SimpleCache();
 
-            $this->cache->cache_path = defined('CACHE_PATH') ? CACHE_PATH : __ROOT__ . '/.cache/';
+            $this->cache->cache_path = defined('CACHE_PATH') ? CACHE_PATH : '.cache/';
             $this->cache->cache_time = defined('CACHE_TTL') ? CACHE_TTL : 3600;
 
             if (!is_dir($this->cache->cache_path)) {
