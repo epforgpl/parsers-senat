@@ -846,7 +846,7 @@ REGEX;
 
                 $action = dNavigateOptional($row, 'td', 1, 'p.podpis',0);
                 if ($action) {
-                    $vote_event['action'] = $action->plaintext;
+                    $vote_event['action'] = $action = $action->plaintext;
                 }
 
                 // Motion (if exists)
