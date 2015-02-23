@@ -833,7 +833,6 @@ REGEX;
                 $vote_event = array(
                     'no' => trim($row->find('td',0)->plaintext),
                     'day' => $i,
-                    'motion' => trim($row->find('td',1)->find('div',0)->plaintext),
                     'results_people_url' => trim($row->find('td',2)->find('a',1)->href),
                     'results_clubs_url' => trim($row->find('td',3)->find('a',0)->href),
                     'source' => $url,
@@ -844,9 +843,23 @@ REGEX;
                         throw new ParserException("Missing $k on $url");
                     }
                 }
+
                 $action = dNavigateOptional($row, 'td', 1, 'p.podpis',0);
                 if ($action) {
                     $vote_event['action'] = $action->plaintext;
+                }
+
+                // Motion (if exists)
+                // Sometimes there are votings over sth proposed in sitting, as for example 11th voting here: http://senat.gov.pl/prace/senat/posiedzenia/przebieg,304,2,glosowania.html
+                $motion = trim($row->find('td',1)->find('div',0)->plaintext);
+                if ($motion) {
+                    $vote_event['motion'] = $motion;
+
+                } else {
+                    // check if it is exception
+                    if ($action != 'Wniosek formalny') {
+                        throw new ParserException("Not specified motion and unknown action $action");
+                    }
                 }
 
                 array_push($ans, $vote_event);
