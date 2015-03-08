@@ -61,7 +61,7 @@ define('HDOM_INFO_OUTER',   6);
 define('HDOM_INFO_ENDSPACE',7);
 define('DEFAULT_TARGET_CHARSET', 'UTF-8');
 define('DEFAULT_BR_TEXT', "\r\n");
-define('DEFAULT_SPAN_TEXT', " ");
+define('DEFAULT_SPAN_TEXT', "");
 
 // increase max size for SenatParser
 define('MAX_FILE_SIZE', 2000000);

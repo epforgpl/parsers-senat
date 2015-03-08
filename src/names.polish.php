@@ -4,6 +4,7 @@ namespace parldata\names;
 
 class Polish {
     static public $dictionary = array(
+        'Eliza' => 'female',
         'Łukasz' => 'male',
         'Czesław' => 'male',
         'Artur' => 'male',

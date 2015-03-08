@@ -1028,7 +1028,7 @@ REGEX;
     public function parseFullName($name) {
         $names = preg_split("/\s+/", $name);
         if (count($names) > 3) {
-            $this->warn("Multi-part name: " . $name);
+            error_log("Multi-part name: " . $name);
         }
 
         $person = array(
