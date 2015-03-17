@@ -104,9 +104,13 @@ class Polish {
         'Edmund' => 'male',
         'Roman' => 'male',
         'Adam' => 'male',
+        'Ludwik' => 'male',
+        'Ignacy' => 'male',
 
         // not polish but needed
-        'János' => 'male'
+        'János' => 'male',
+        'Walerij' => 'male',
+        'Iurie' => 'male'
     );
 
     public $guesses = array();

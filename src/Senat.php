@@ -745,8 +745,21 @@ REGEX;
         $html = $this->curl_get($url);
         $dom = str_get_html($html);
 
+        $grouped = array();
+        $people = array();
+
+        if ($podtytul = dNavigateOptional($dom, 'h4.podtytul', 0)) {
+            if ($podtytul->plaintext == 'Głosowanie anulowane') {
+                return array(
+                    'grouped' => $grouped,
+                    'votes' => $people
+                );
+            }
+        }
+
         $map = array(
             'obecnych' => 'present',
+            'głosowało' => 'present',
             'za' => 'yes',
             'przeciw' => 'no',
             'wstrzymało się' => 'abstain',
@@ -762,7 +775,6 @@ REGEX;
             'nieob.' => 'absent'
         );
 
-        $grouped = array();
         foreach(dAtLeast($dom, 'div.ogolne-wyniki span', 1) as $group) {
             $matches = array();
             if (!preg_match("/([\w\s]+):\s*(\d+)/iu", $group->plaintext, $matches)) {
@@ -776,7 +788,6 @@ REGEX;
             $grouped[$map[$type]] = intval($matches[2]);
         }
 
-        $people = array();
         foreach(dAtLeast($dom, '.glosy-senatorow .senator', 1) as $senator) {
             $s = dExactlyOne($senator, '.dane')->plaintext;
             $v = dExactlyOne($senator, '.glos')->plaintext;
