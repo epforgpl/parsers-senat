@@ -20,7 +20,6 @@ JSON including all the info, please view it for example at http://jsonviewer.sta
     $data = $SP->updateSenatorsAll();
 
     echo '<textarea>'.json_encode($data).'</textarea>';
-//    var_dump($SP->updateSenatorInfo(33));
 
 ?>
 
