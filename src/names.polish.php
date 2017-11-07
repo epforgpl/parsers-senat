@@ -3,6 +3,7 @@
 namespace parldata\names;
 
 class Polish {
+    // TODO scrape https://pl.wiktionary.org/wiki/Indeks:Polski_-_Imiona
     static public $dictionary = array(
         'Eliza' => 'female',
         'Łukasz' => 'male',
@@ -106,11 +107,38 @@ class Polish {
         'Adam' => 'male',
         'Ludwik' => 'male',
         'Ignacy' => 'male',
+        'Margareta' => 'female',
+        'Arkadiusz' => 'male',
+        'Bogusława' => 'female',
+        'Krystian' => 'male',
+        'Konstanty' => 'male',
+        'Lidia' => 'female',
+        'Konrad' => 'male',
+        'Jeremi' => 'male',
+        'Sebastian' => 'male',
+        'Patryk' => 'male',
+        'Marzenna' => 'female',
+        'Marzanna' => 'female',
+        'Anita' => 'female',
+        'Filip' => 'male',
+        'Teresa' => 'female',
+        'Dawid' => 'male',
+        'Ernest' => 'male',
+        'Dobrosław' => 'male',
+        'Agata' => 'female',
+        'Renata' => 'female',
+        'Karol' => 'male',
+        'Szymon' => 'male',
+        'Justyna' => 'female',
+        'Marcin' => 'male',
+        'Eugeniusz' => 'male',
 
         // not polish but needed
         'János' => 'male',
         'Walerij' => 'male',
-        'Iurie' => 'male'
+        'Iurie' => 'male',
+        'Ramiz' => 'male',
+        'Corina' => 'female',
     );
 
     public $guesses = array();
