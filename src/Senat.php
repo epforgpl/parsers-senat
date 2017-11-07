@@ -519,7 +519,7 @@ class Senat {
         return $this->__senatorExtractTeams($html, '<p class="etykieta">Zespoły senackie</p>', '</ul>');
     }
 
-    public function updateSenatorSpeechesList($SenatorID, $chamberInt) {
+    public function parseSenatorSpeechesList($SenatorID, $chamberInt) {
         $html = $this->curl_get(self::BASE_URL . '/sklad/senatorowie/aktywnosc,' . $SenatorID . ',' . $chamberInt . '.html');
 
         $re = "/<tr>[^<]*?<td class=\"numer-posiedzenia\">([\\d]*?)<\\/td>[\\s\\S]*?<td class=\"data-aktywnosci nowrap\">([^<]*?)<\\/td>[^<]*?<td class=\"punkt\">([^<]*?)<\\/td>[^<]*?<td class=\"etapy\">([\\s\\S]*?)<\\/td>[^<]*?<\\/tr>/";
@@ -567,7 +567,7 @@ class Senat {
         return self::BASE_URL . '/prace/senat/posiedzenia/przebieg,' . $id_sitting_with_day . '.html';
     }
 
-    public function updateSenatorVotesAtMeeting($SenatorID, $MeetingID) {
+    public function parseSenatorVotesAtMeeting($SenatorID, $MeetingID) {
         $html = $this->curl_get(self::BASE_URL . '/sklad/senatorowie/aktywnosc-glosowania,' . $SenatorID . ',8,szczegoly,' . $MeetingID . '.html');
 
         $re = "/<td>[^<]*?<a href=\"(\\/sklad\\/senatorowie\\/szczegoly-glosowania,([^,]*),([^,]*),8.html)\">[^<]*?<\\/a>[^<]*?<\\/td>[^<]*?<td>[^<]*?<\\/td>[^<]*?<td>([^<]*)<\\/td>/";
@@ -587,7 +587,7 @@ class Senat {
     }
 
     //Vote might me: za/przeciw/wstrzymał się/nie głosował/nieobecny
-    public function updateSenatorVotingActivity($SenatorID) {
+    public function parseSenatorVotingActivity($SenatorID) {
         $html = $this->curl_get(self::BASE_URL . '/sklad/senatorowie/aktywnosc-glosowania,' . $SenatorID . ',8.html');
 
         $re = "/<td class=\"nowrap\">[^<]*?<a href=\"(\\/sklad\\/senatorowie\\/aktywnosc-glosowania,[\\d]*,8,szczegoly,([^.]*)\\.html)\">[^<]*?<\\/a>[^<]*?<\\/td>/";
@@ -598,7 +598,7 @@ class Senat {
 
         $ans = array();
         foreach ($matches as $match) {
-            $ans[$match[2]] = $this->updateSenatorVotesAtMeeting($SenatorID, $match[2]);
+            $ans[$match[2]] = $this->parseSenatorVotesAtMeeting($SenatorID, $match[2]);
         }
         return $ans;
     }
@@ -608,8 +608,7 @@ class Senat {
      * @param $chamberNo Poczynając od IX kadencji na stronach Senatu zaczęto aggregować archiwalne informacje
      * @return array
      */
-    // TODO rename update to parse
-    public function updateSenatorInfo($SenatorID, $chamberNo) {
+    public function parseSenatorInfo($SenatorID, $chamberNo) {
         $url = self::BASE_URL . '/sklad/senatorowie/senator,' . $SenatorID . ',' . $chamberNo . '.html';
         $html = $this->curl_get($url);
 
@@ -629,7 +628,7 @@ class Senat {
                 'committees' => $this->_senatorExtractCommissions($html),
                 'parliamentary_assemblies' => $this->_senatorExtractParlimentaryAssemblies($html),
                 'senat_assemblies' => $this->_senatorExtractSenatAssemblies($html),
-                'activity_senat_meetings' => $this->updateSenatorSpeechesList($SenatorID, $chamberNo),
+                'activity_senat_meetings' => $this->parseSenatorSpeechesList($SenatorID, $chamberNo),
                 'senator_statements' => self::BASE_URL . '/sklad/senatorowie/oswiadczenia-senatorskie,' . $SenatorID . ',' . $chamberNo . '.html',
                 'source' => $url
             );
@@ -652,7 +651,7 @@ class Senat {
      * @return array
      * @throws ParserException
      */
-    public function updateSenatorsList($chamberNo = null) {
+    public function parseSenatorsList($chamberNo = null) {
         if ($chamberNo === null) {
             $html = $this->curl_get($this->urlSenatorsList());
         } else {
@@ -707,19 +706,19 @@ class Senat {
         return md5(json_encode($inArray));
     }
 
-    public function updateSenatorsAll() {
-        $list = $this->updateSenatorsList();
+    public function parseSenatorsAll() {
+        $list = $this->parseSenatorsList();
 
         foreach ($list as &$senator) {
-            $senator['info'] = $this->updateSenatorInfo($senator['id']);
+            $senator['info'] = $this->parseSenatorInfo($senator['id']);
         }
 
         return $list;
     }
 
     /**
-     * This will extract one speech from stenogram (from ::updateMeetingStenogram method), using given $speechRel.
-     * @param string $meetingTxt Output of ::updateMeetingStenogram
+     * This will extract one speech from stenogram (from ::parseMeetingStenogram method), using given $speechRel.
+     * @param string $meetingTxt Output of ::parseMeetingStenogram
      * @param string $speechRel Speech rel of Senator`s speech.
      * @param bool $removeMarszalekEtc When true (default) it will try to remove speeches of Marszałek and Wicemarszałek (as it would be introduce to next speech).
      * @return string
@@ -778,7 +777,7 @@ class Senat {
      * @param string $meetingID Meeting ID.
      * @return string Text, witouh double spaces, HTML etc.
      */
-    public function updateMeetingStenogram($meetingID) {
+    public function parseMeetingStenogram($meetingID) {
         $text = "\r\n";
         $i = 0;
         do {
@@ -809,7 +808,7 @@ REGEX;
     }
 
     // http://senat.gov.pl/prace/senat/posiedzenia/glosowanie-drukuj,368.html
-    public function updatePeopleVotes($url) {
+    public function parsePeopleVotes($url) {
         $html = $this->curl_get($url);
         $dom = str_get_html($html);
 
@@ -891,7 +890,7 @@ REGEX;
         return self::BASE_URL . '/prace/senat/posiedzenia/przebieg,' . $source_ids[0] . ',' . $i . ',glosowania.html';
     }
 
-    public function updateMeetingVotings($meetingID) {
+    public function parseMeetingVotings($meetingID) {
         $ans = array();
 
         $i = 0;
@@ -955,7 +954,7 @@ REGEX;
      * This will return list of all meetings
      * @return array ['id'=>ID of meeting, 'name'=>Name/title/subject of meeting. 'when'=>Date(s) of meeting(s)]
      */
-    public function updateMeetingsList() {
+    public function parseMeetingsList() {
         $answer = array();
 
         $i = 0;
