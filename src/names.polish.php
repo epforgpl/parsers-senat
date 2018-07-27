@@ -173,10 +173,10 @@ class Polish {
     function mapGender($given_name) {
         $given_name = trim($given_name);
 
-        if (has_key(self::$dictionary, $given_name)) {
+        if (array_key_exists($given_name, self::$dictionary)) {
             return self::$dictionary[$given_name];
         }
-        if (has_key($this->guesses, $given_name)) {
+        if (array_key_exists($given_name, $this->guesses)) {
             return $this->guesses[$given_name];
         }
 

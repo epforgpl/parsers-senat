@@ -16,7 +16,7 @@ class NetworkException extends \Exception {
 }
 
 class Senat {
-    const BASE_URL = 'http://senat.gov.pl';
+    const BASE_URL = 'https://www.senat.gov.pl';
 
     private $cache;
 
@@ -848,7 +848,7 @@ REGEX;
                 throw new ParserException("Couldn't parse " . $group->plaintext);
             }
             $type = trim($matches[1]);
-            if (!has_key($map, $type)) {
+            if (!array_key_exists($type, $map)) {
                 throw new ParserException("Unknown vote type: $type");
             }
 
@@ -861,7 +861,7 @@ REGEX;
 
             if ($s == 'H. H. Hatka') $s = 'H. Hatka';
 
-            if (!has_key($mapDetails, $v)) {
+            if (!array_key_exists($v, $mapDetails)) {
                 throw new ParserException("Unknown details vote type: $v");
             }
             $v = $mapDetails[$v];
